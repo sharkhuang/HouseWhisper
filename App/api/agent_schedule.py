@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from App.dal.calender import CalendarEvent
 from App.dal.calender import get_db
-from App.dal.calender import get_events
+from App.dal.calender import get_agent_events
 # Create the router with a prefix
 agent_schedule_router = APIRouter(
     prefix="/agent-schedule",
@@ -43,8 +43,6 @@ async def check_availability(client_id: str,
             }
         """
 
-        print(f"start_time: {start_time}")
-        print(f"end_time: {end_time}")
         db = get_db()
         query = db.query(CalendarEvent).filter(
             and_(
@@ -79,7 +77,6 @@ async def check_availability(client_id: str,
                     {
                         "start": event.start_time,
                         "end": event.end_time,
-                        "type": event.event_type
                     } for event in conflicts
                 ]
             }
@@ -131,8 +128,6 @@ async def check_day_utilization(client: str,
 
 # Example endpoint
 @agent_schedule_router.get("/")
-async def get_schedules():
-    events = get_events()
-    for event in events:
-        print(f"event: {event.calendar_id}")
+async def get_schedules(client_id: str, agent_id: str):
+    events = get_agent_events(client_id, agent_id)
     return {"message": "Agent schedules endpoint" , "events": events}

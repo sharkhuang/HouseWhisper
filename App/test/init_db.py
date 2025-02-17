@@ -13,7 +13,7 @@ if project_root not in sys.path:
 
 from App.dal.calender import (
     sync_calendar_to_db,
-    get_events
+    get_agent_events
 )
 
 def main():
@@ -23,13 +23,13 @@ def main():
     sync_calendar_to_db("123", "456", calendar_path)
     
     # Retrieve and print events
-    events = get_events()
+    events = get_agent_events("123", "456")
     for event in events:
         print(f"Calendar ID: {event.calendar_id}")
         print(f"Client ID: {event.client_id}")
         print(f"Agent ID: {event.agent_id}")
         print(f"Event: {event.summary}")
-        print(f"Time: {event.start_time.astimezone()} - {event.end_time.astimezone()}")
+        print(f"Time: {event.start_time} - {event.end_time}")
         print("---")
     
 if __name__ == "__main__":

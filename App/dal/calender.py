@@ -1,32 +1,60 @@
 from icalendar import Calendar
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone, date
+from sqlalchemy.types import TypeDecorator  
 import os
-
 # Initialize SQLAlchemy
 Base = declarative_base()
+
+class UTCDateTime(TypeDecorator):
+    """Automatically convert naive datetime to UTC and store with timezone info"""
+    impl = DateTime(timezone=True)
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+            
+        # Convert date to datetime if necessary
+        if isinstance(value, date) and not isinstance(value, datetime):
+            value = datetime.combine(value, datetime.min.time())
+            
+        # Now handle timezone
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc)
+
 
 class CalendarEvent(Base):
     __tablename__ = 'calendar_events'
     
     calendar_id = Column(String, primary_key=True)
-    client_id = Column(String)
-    agent_id = Column(String)
+    client_id = Column(String, index=True)
+    agent_id = Column(String, index=True)
     summary = Column(String)
     description = Column(String)
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
+    start_time = Column(UTCDateTime, index=True)
+    end_time = Column(UTCDateTime)
 
+    # Create combined index
+    __table_args__ = (
+        Index('idx_client_agent_start', 'client_id', 'agent_id', 'start_time'),
+    )
 
 # Global variables for engine and session
 engine = None
 session = None
 
 def init_db():
-    # Create database URL
-    db_url = "sqlite:///calendar.db"  # Use SQLite for simplicity
+    # Create database URL using absolute path
+    db_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'calendar.db'))
+    db_url = f"sqlite:///{db_path}"
     
     global engine, session
     if engine is None:
@@ -44,7 +72,6 @@ def get_db():
     if session is None:
         engine, session = init_db()
 
-    print(session)
     return session
 
 def close_db():
@@ -74,9 +101,9 @@ def sync_calendar_to_db(client_id: str, agent_id: str, calendar_path):
             client_id=client_id,
             agent_id=agent_id,
             summary=str(component.get('summary')),
-            description=str(component.get('description', '')),
+            description=str(component.get('description', '')),  
             start_time=component.get('dtstart').dt,
-            end_time=component.get('dtend').dt if component.get('dtend') else None
+            end_time=component.get('dtend').dt
         )
         
         session.add(event)
@@ -85,11 +112,10 @@ def sync_calendar_to_db(client_id: str, agent_id: str, calendar_path):
     session.commit()
     session.close()
 
-def get_events():
+def get_agent_events(client_id: str, agent_id: str):
     try:
         db = get_db()
-        events = db.query(CalendarEvent).all()
-        print(f"Query executed, found {len(events)} events")
+        events = db.query(CalendarEvent).filter_by(client_id=client_id, agent_id=agent_id).all()
         return events
     except Exception as e:
         print(f"Error in get_events: {str(e)}")
