@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,15 +34,6 @@ async def check_availability(client_id: str,
         # Calculate end time
         end_time = start_time + timedelta(minutes=duration_minutes)
         
-        """
-        # Business hours check (assuming 9 AM to 5 PM)
-        if local_start_time.hour < 9 or local_end_time.hour >= 17:
-            return {
-                "available": False,
-                "reason": "Requested time is outside business hours (9 AM - 5 PM)"
-            }
-        """
-
         db = get_db()
         query = db.query(CalendarEvent).filter(
             and_(
@@ -98,11 +89,45 @@ async def check_availability(client_id: str,
         }
 
     
+def find_slots(events, start_time: datetime, duration_minutes: int, limit: int = 3):
+    """
+    Find available time slots between events where interval >= duration_minutes
+    Args:
+        events: List of events sorted by start_time
+        duration_minutes: Required duration in minutes
+        limit: Maximum number of slots to return
+    Returns:
+        List of tuples (start_time, end_time) representing available slots
+    """
+    available_slots = []
+    duration_delta = timedelta(minutes=duration_minutes)
+    # Initialize with first event's end time
+    last_end_time = start_time
+    # Check intervals between events
+    for event in events:
+        interval_start = last_end_time
+        interval_end = event.start_time
+        
+        # If interval is large enough
+        if interval_end - interval_start >= duration_delta:
+            available_slots.append((interval_start, interval_end))
+            if len(available_slots) >= limit:
+                break
+                
+        last_end_time = max(last_end_time, event.end_time)
+    
+    if len(available_slots) < limit:
+        for i in range(limit - len(available_slots)):
+            available_slots.append((last_end_time, last_end_time + duration_delta))
+            last_end_time += duration_delta 
 
-@agent_schedule_router.post("/find-available-times")
-async def find_available_times(client: str,
+    return available_slots[:limit]
+
+@agent_schedule_router.get("/find-available-timeslots")
+async def find_available_timeslots(client_id: str,
     agent_id: str,
-    time_ranges: List[datetime],
+    start_time: datetime = None,
+    end_time: datetime = None,
     duration_minutes: int = 60,
     num_slots: int = 3):
     """
@@ -118,7 +143,25 @@ async def find_available_times(client: str,
     Returns:
     - available_slots: List of available time slots
     """
-    pass
+    try:
+        # Get all events for the agent
+        if start_time is None:
+            start_time = datetime.now(timezone.utc)
+        if end_time is None:
+            end_time = start_time + timedelta(days=1)
+
+        events = get_agent_events(client_id, agent_id, start_time, end_time)
+        available_slots = find_slots(events, start_time, duration_minutes, num_slots)
+        return {
+            "available_slots": available_slots
+        }
+    
+    except Exception as e:
+        return {
+            "available": False,
+            "reason": "Internal error checking availability",
+            "error": str(e)
+        }
 
 @agent_schedule_router.get("/check-day-utilization")
 async def check_day_utilization(client: str,
@@ -128,6 +171,6 @@ async def check_day_utilization(client: str,
 
 # Example endpoint
 @agent_schedule_router.get("/")
-async def get_schedules(client_id: str, agent_id: str):
-    events = get_agent_events(client_id, agent_id)
+async def get_schedules(client_id: str, agent_id: str, start_time: datetime = None, end_time: datetime = None):
+    events = get_agent_events(client_id, agent_id, start_time, end_time)
     return {"message": "Agent schedules endpoint" , "events": events}

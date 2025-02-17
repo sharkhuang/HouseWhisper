@@ -46,6 +46,9 @@ class CalendarEvent(Base):
     __table_args__ = (
         Index('idx_client_agent_start', 'client_id', 'agent_id', 'start_time'),
     )
+    __table_args__ = (
+        Index('idx_client_agent_start_end', 'client_id', 'agent_id', 'end_time'),
+    )
 
 # Global variables for engine and session
 engine = None
@@ -112,10 +115,15 @@ def sync_calendar_to_db(client_id: str, agent_id: str, calendar_path):
     session.commit()
     session.close()
 
-def get_agent_events(client_id: str, agent_id: str):
+def get_agent_events(client_id: str, agent_id: str, start_time: datetime = None, end_time: datetime = None):
     try:
         db = get_db()
-        events = db.query(CalendarEvent).filter_by(client_id=client_id, agent_id=agent_id).all()
+        query = db.query(CalendarEvent).filter_by(client_id=client_id, agent_id=agent_id)
+        if start_time:
+            query = query.filter(CalendarEvent.start_time >= start_time)
+        if end_time:
+            query = query.filter(CalendarEvent.end_time <= end_time)
+        events = query.all()
         return events
     except Exception as e:
         print(f"Error in get_events: {str(e)}")
