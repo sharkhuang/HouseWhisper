@@ -115,15 +115,24 @@ def sync_calendar_to_db(client_id: str, agent_id: str, calendar_path):
     session.commit()
     session.close()
 
-def get_agent_events(client_id: str, agent_id: str, start_time: datetime = None, end_time: datetime = None):
+def get_agent_events(client_id: str, agent_id: str, start_time: datetime, end_time: datetime):
     try:
         max_events = 100
         db = get_db()
-        query = db.query(CalendarEvent).filter_by(client_id=client_id, agent_id=agent_id)
-        if start_time:
-            query = query.filter(CalendarEvent.start_time >= start_time)
-        if end_time:
-            query = query.filter(CalendarEvent.end_time <= end_time)
+        query = db.query(CalendarEvent).filter(
+            (CalendarEvent.client_id == client_id) &
+            (CalendarEvent.agent_id == agent_id) &
+            (
+                ( #event starts after start_time and ends after end_time
+                    (CalendarEvent.start_time >= start_time) &
+                    (CalendarEvent.end_time <= end_time)
+                ) |
+                ( #event starts before start_time and ends after start_time
+                    (CalendarEvent.start_time < start_time) &
+                    (CalendarEvent.end_time >= start_time)
+                )
+            )
+        )
         
         events = query.order_by(CalendarEvent.start_time.asc()).limit(max_events).all()
         return events
