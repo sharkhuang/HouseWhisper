@@ -115,6 +115,60 @@ def sync_calendar_to_db(client_id: str, agent_id: str, calendar_path):
     session.commit()
     session.close()
 
+    
+def merge_calendar_to_db(client_id: str, agent_id: str, calendar_path):
+    """Merge calendar events to database, updating existing events and removing deleted ones"""
+
+    print(f"Merging calendar to db for {client_id} {agent_id} {calendar_path}")
+    try:
+        cal = None
+        with open(calendar_path, 'rb') as f:
+            cal = Calendar.from_ical(f.read())
+
+        # Collect all event UIDs from the calendar file
+        calendar_uids = {str(component.get('uid')) for component in cal.walk('VEVENT')}
+        
+        session = get_db()
+        # Delete events that are no longer in the calendar
+        session.query(CalendarEvent).filter(
+            (CalendarEvent.client_id == client_id) &
+            (CalendarEvent.agent_id == agent_id) &
+            ~CalendarEvent.calendar_id.in_(calendar_uids)
+        ).delete(synchronize_session='fetch')
+    
+        # Process each event
+        for component in cal.walk('VEVENT'):
+            calendar_id = str(component.get('uid'))
+            existing_event = session.query(CalendarEvent).filter_by(
+                calendar_id=calendar_id
+            ).first()
+
+            if existing_event:
+                # Update existing event
+                existing_event.summary = str(component.get('summary'))
+                existing_event.description = str(component.get('description', ''))
+                existing_event.start_time = component.get('dtstart').dt
+                existing_event.end_time = component.get('dtend').dt
+            else:
+                # Create new event
+                event = CalendarEvent(
+                    calendar_id=calendar_id,
+                    client_id=client_id,
+                    agent_id=agent_id,
+                    summary=str(component.get('summary')),
+                    description=str(component.get('description', '')),
+                    start_time=component.get('dtstart').dt,
+                    end_time=component.get('dtend').dt
+                )
+                session.add(event)
+            
+        # Commit changes
+        session.commit()
+    except Exception as e:
+        print(f"Error merging calendar to db: {str(e)}")
+    finally:
+        session.close()
+
 def get_agent_events(client_id: str, agent_id: str, start_time: datetime, end_time: datetime):
     try:
         max_events = 100
