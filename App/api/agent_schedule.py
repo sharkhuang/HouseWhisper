@@ -164,10 +164,49 @@ async def find_available_timeslots(client_id: str,
         }
 
 @agent_schedule_router.get("/check-day-utilization")
-async def check_day_utilization(client: str,
+async def check_day_utilization(client_id: str,
     agent_id: str,
-    date: datetime):
-    pass
+    date: datetime = None):
+    """
+    Check the utilization of an agent's calendar for a specific day
+    
+    Args:
+        client_id: Unique identifier for the client
+        agent_id: Unique identifier for the agent
+        date: The specific date to check
+    
+    Returns:
+        Dict containing utilization information
+    """
+    try:
+        # Get all events for the agent on the specific date
+        print(f"Checking utilization for {agent_id} on {date}")
+        if date is None:
+            date = datetime.now(timezone.utc)
+
+        start_time = datetime.combine(date, datetime.min.time())
+        end_time = datetime.combine(date + timedelta(days=1), datetime.min.time())
+
+        events = get_agent_events(client_id, agent_id, start_time, end_time)
+        
+        # Calculate total utilization for the day
+        total_utilization = 0
+        for event in events:
+            total_utilization += (event.end_time - event.start_time).total_seconds() / 60
+        
+        total_minutes = 8 * 60 # 8 hours per day    
+        utilization_percentage = round((total_utilization / total_minutes) * 100)
+        return {
+            "utilization_percentage": utilization_percentage,
+            "events": events
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "reason": "Internal error checking utilization",
+            "error": str(e)
+        }
+    
 
 # Example endpoint
 @agent_schedule_router.get("/")
