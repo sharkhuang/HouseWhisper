@@ -102,22 +102,19 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
     available_slots = []
     duration_delta = timedelta(minutes=duration_minutes)
   
-    if not events:
-        last_end_time = start_time
-    else:
-        # Handle case where start_time falls within first event
-        if start_time >= events[0].start_time and start_time < events[0].end_time:
-            last_end_time = events[0].end_time
-        else:
-            last_end_time = start_time
+    last_end_time = start_time if start_time else datetime.now(timezone.utc)
+
     # Check intervals between events
     for event in events:
         if event.end_time <= start_time:
             continue
 
+        if last_end_time >= event.start_time and last_end_time < event.end_time:
+            last_end_time = event.end_time
+            continue
+
         interval_start = last_end_time
         interval_end = event.start_time
-        
         # If interval is large enough
         if interval_end - interval_start >= duration_delta:
             available_slots.append((interval_start, interval_end))
@@ -138,7 +135,7 @@ async def find_available_timeslots(client_id: str,
     agent_id: str,
     start_time: datetime = None,
     end_time: datetime = None,
-    duration_minutes: int = 60,
+    duration_minutes: int = 30,
     num_slots: int = 3):
     """
     Find available time slots within given time ranges
@@ -147,7 +144,7 @@ async def find_available_timeslots(client_id: str,
     - client: Unique identifier for the client
     - agent_id: Unique identifier for the agent
     - time_ranges: List of time ranges to search within
-    - duration_minutes: Desired meeting duration in minutes (default: 60)
+    - duration_minutes: Desired meeting duration in minutes (default: 30)
     - num_slots: Number of available slots to return (default: 3)
     
     Returns:
