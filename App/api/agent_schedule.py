@@ -117,7 +117,12 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
         interval_end = event.start_time
         # If interval is large enough
         if interval_end - interval_start >= duration_delta:
-            available_slots.append((interval_start, interval_end))
+            available_slot = {
+                "start": interval_start,
+                "end": interval_end,
+                "duration_minutes": duration_minutes
+            }
+            available_slots.append(available_slot)
             if len(available_slots) >= limit:
                 break
                 
@@ -125,7 +130,12 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
     
     if len(available_slots) < limit:
         for i in range(limit - len(available_slots)):
-            available_slots.append((last_end_time, last_end_time + duration_delta))
+            available_slot = {
+                "start": last_end_time,
+                "end": last_end_time + duration_delta,
+                "duration_minutes": duration_minutes
+            }
+            available_slots.append(available_slot)
             last_end_time += duration_delta 
 
     return available_slots[:limit]
@@ -159,10 +169,32 @@ async def find_available_timeslots(client_id: str,
 
         events = get_agent_events(client_id, agent_id, start_time, end_time)
         available_slots = find_slots(events, start_time, duration_minutes, num_slots)
-        return {
-            "available_slots": available_slots,
-            "events": events
-        }
+
+        if available_slots:
+            return {
+                "available_slots": available_slots,
+                "earliest_slot": available_slots[0]["start"],
+                "events": events
+            }
+        else:
+            if events:
+                earliest_slot = events[-1].end_time
+            else:
+                start_time = end_time
+                end_time = start_time + timedelta(days=5)
+                events = get_agent_events(client_id, agent_id, start_time, end_time)
+                if events:
+                    earliest_slot = events[-1].end_time
+                else:
+                    return {
+                        "message": f"No available slots in the next {days + 5} days",
+                    }
+
+            return {
+                "available_slots": [],
+                "earliest_slot": earliest_slot,
+                "events": events
+            }
     
     except Exception as e:
         return {
