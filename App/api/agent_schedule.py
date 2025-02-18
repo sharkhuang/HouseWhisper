@@ -59,7 +59,7 @@ async def check_availability(client_id: str,
             )
         )
         
-        conflicts = query.all()
+        conflicts = query.order_by(CalendarEvent.start_time.asc()).all()
         if conflicts:
             return {
                 "available": False,
@@ -127,18 +127,8 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
                 break
                 
         last_end_time = max(last_end_time, event.end_time)
-    
-    if len(available_slots) < limit:
-        for i in range(limit - len(available_slots)):
-            available_slot = {
-                "start": last_end_time,
-                "end": last_end_time + duration_delta,
-                "duration_minutes": duration_minutes
-            }
-            available_slots.append(available_slot)
-            last_end_time += duration_delta 
 
-    return available_slots[:limit]
+    return available_slots
 
 @agent_schedule_router.get("/find-available-timeslots")
 async def find_available_timeslots(client_id: str,
@@ -151,9 +141,10 @@ async def find_available_timeslots(client_id: str,
     Find available time slots within given time ranges
     
     Parameters:
-    - client: Unique identifier for the client
+    - client_id: Unique identifier for the client
     - agent_id: Unique identifier for the agent
-    - time_ranges: List of time ranges to search within
+    - start_time: The specific date to check
+    - end_time: The specific date to check
     - duration_minutes: Desired meeting duration in minutes (default: 30)
     - num_slots: Number of available slots to return (default: 3)
     
@@ -170,29 +161,26 @@ async def find_available_timeslots(client_id: str,
         events = get_agent_events(client_id, agent_id, start_time, end_time)
         available_slots = find_slots(events, start_time, duration_minutes, num_slots)
 
-        if available_slots:
+        if available_slots is None or len(available_slots) == 0:
+            # if no available slots, find the potential earliest slot in the next 5 days
+            start_time = end_time
+            end_time = start_time + timedelta(days=5)
+            events = get_agent_events(client_id, agent_id, start_time, end_time)
+            available_slots = find_slots(events, start_time, duration_minutes, num_slots)
+            if available_slots is None or len(available_slots) == 0:
+                return {
+                    "message": f"No available slots in the search range and 5 days later",
+                }
+            else:
+                return {
+                    "available_slots": available_slots,
+                    "earliest_slot": available_slots[0]["start"],
+                    "events": events
+                }
+        else:
             return {
                 "available_slots": available_slots,
                 "earliest_slot": available_slots[0]["start"],
-                "events": events
-            }
-        else:
-            if events:
-                earliest_slot = events[-1].end_time
-            else:
-                start_time = end_time
-                end_time = start_time + timedelta(days=5)
-                events = get_agent_events(client_id, agent_id, start_time, end_time)
-                if events:
-                    earliest_slot = events[-1].end_time
-                else:
-                    return {
-                        "message": f"No available slots in the next {days + 5} days",
-                    }
-
-            return {
-                "available_slots": [],
-                "earliest_slot": earliest_slot,
                 "events": events
             }
     
@@ -214,7 +202,8 @@ async def check_day_utilization(client_id: str,
     Args:
         client_id: Unique identifier for the client
         agent_id: Unique identifier for the agent
-        date: The specific date to check
+        start_time: The specific date to check
+        days: The number of days to check
     
     Returns:
         Dict containing utilization information

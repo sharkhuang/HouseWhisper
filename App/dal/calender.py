@@ -11,7 +11,8 @@ Base = declarative_base()
 class UTCDateTime(TypeDecorator):
     """Automatically convert naive datetime to UTC and store with timezone info"""
     impl = DateTime(timezone=True)
-
+    cache_ok = True
+    
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
