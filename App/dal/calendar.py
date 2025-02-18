@@ -189,10 +189,6 @@ def get_agent_events(client_id: str, agent_id: str, start_time: datetime, end_ti
         )
         
         events = query.order_by(CalendarEvent.start_time.asc()).all()
-        print("------------5555-----------------")
-        for event in events:
-            print(event.start_time, event.end_time)
-        print("--------------------------------")
         return events
     except Exception as e:
         print(f"Error in get_events: {str(e)}")

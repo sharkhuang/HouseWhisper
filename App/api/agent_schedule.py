@@ -203,6 +203,7 @@ async def find_available_timeslots(client_id: str,
             "error": str(e)
         }
 
+# TODO: need to support local timezone later.
 @agent_schedule_router.get("/check-day-utilization")
 async def check_day_utilization(client_id: str,
     agent_id: str,
@@ -256,7 +257,7 @@ async def check_day_utilization(client_id: str,
         }
     
 
-# Example endpoint
+# test endpoint
 @agent_schedule_router.get("/")
 async def get_schedules(client_id: str, agent_id: str, start_time: datetime = None, end_time: datetime = None):
     if start_time is None:
