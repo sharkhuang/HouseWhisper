@@ -11,9 +11,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
     print(f"Added {project_root} to Python path")
 
-from App.dal.calender import (
+from App.dal.calendar import (
     sync_calendar_to_db,
-    get_agent_events
+    get_agent_events    
 )
 
 def main():

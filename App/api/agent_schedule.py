@@ -4,12 +4,11 @@ from typing import List, Optional
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from App.dal.calender import CalendarEvent
-from App.dal.calender import get_db
-from App.dal.calender import get_agent_events
+from App.dal.calendar import get_db
+from App.dal.calendar import get_agent_events
 # Create the router with a prefix
 agent_schedule_router = APIRouter(
-    prefix="/agent-schedule",
+    prefix="/agent-schedule",   
     tags=["agent-schedule"]
 )
 
@@ -101,14 +100,20 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
     """
     available_slots = []
     duration_delta = timedelta(minutes=duration_minutes)
-  
     last_end_time = start_time if start_time else datetime.now(timezone.utc)
 
-    if start_time < events[0].start_time:
+    if not events:
+        for i in range(limit):
+            slot = {
+                "start": start_time,
+                "end": start_time + duration_delta,
+                "duration_minutes": duration_minutes
+            }
+            available_slots.append(slot)
+        return available_slots
+    else:
         while start_time + duration_delta < events[0].start_time:
             slot = { "start": start_time, "end": start_time + duration_delta, "duration_minutes": duration_minutes}
-            print("slot")
-            print(slot)
             available_slots.append(slot)
             if len(available_slots) >= limit:
                 return available_slots

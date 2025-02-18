@@ -1,10 +1,11 @@
-from icalendar import Calendar
+
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone, date
 from sqlalchemy.types import TypeDecorator  
 import os
+from icalendar import Calendar
 # Initialize SQLAlchemy
 Base = declarative_base()
 
@@ -12,7 +13,6 @@ class UTCDateTime(TypeDecorator):
     """Automatically convert naive datetime to UTC and store with timezone info"""
     impl = DateTime(timezone=True)
     cache_ok = True
-    
     def process_bind_param(self, value, dialect):
         if value is None:
             return None

@@ -23,5 +23,5 @@ python test/init_db.py
 
 * sync calendars:
 ```
-python jobs/calender_sync.py
+python jobs/calendar_sync.py
 ```

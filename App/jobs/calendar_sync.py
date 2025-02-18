@@ -8,7 +8,7 @@ import schedule
 from typing import List, Dict
 from queue import Queue, Empty
 import threading
-from dal.calender import merge_calendar_to_db
+from dal.calendar import merge_calendar_to_db
 
 class CalendarSyncQueue:
     def __init__(self, num_consumers: int = 2):
@@ -25,7 +25,7 @@ class CalendarSyncQueue:
                     merge_calendar_to_db(
                         agent["client_id"],
                         agent["agent_id"],
-                        agent["calender_url"]
+                        agent["calendar_url"]
                     )
                 except Exception as e:
                     print(f"Error syncing calendar for agent {agent['agent_id']}: {str(e)}")
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         {
             "client_id": "123",
             "agent_id": "456",
-            "calender_url": "./test/data/test_calendar.ics", 
+            "calendar_url": "./test/data/test_calendar.ics", 
             "last_sync": None
         }
     ]
