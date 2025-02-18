@@ -112,14 +112,12 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
             available_slots.append(slot)
         return available_slots
     else:
-        while start_time + duration_delta < events[0].start_time:
-            slot = { "start": start_time, "end": start_time + duration_delta, "duration_minutes": duration_minutes}
+        while last_end_time + duration_delta < events[0].start_time:
+            slot = { "start": last_end_time, "end": last_end_time + duration_delta, "duration_minutes": duration_minutes}
             available_slots.append(slot)
             if len(available_slots) >= limit:
                 return available_slots
             last_end_time = slot["end"]
-            start_time = slot["end"]
-    # Check intervals between events
 
     for event in events:
         if event.end_time <= start_time:
@@ -129,20 +127,17 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
             last_end_time = event.end_time
             continue
 
-        interval_start = last_end_time
-        interval_end = event.start_time
-        # If interval is large enough
-        while interval_end - interval_start >= duration_delta:
-            available_slot = {
-                "start": interval_start,
-                "end": interval_end,
+        while last_end_time + duration_delta <= event.start_time:
+            slot = {
+                "start": last_end_time,
+                "end": last_end_time+duration_delta,
                 "duration_minutes": duration_minutes
             }
-            available_slots.append(available_slot)
+            available_slots.append(slot)
             if len(available_slots) >= limit:
-                break
-            interval_start = interval_end
-            interval_end = interval_start + duration_delta
+                return available_slots
+                
+            last_end_time = slot["end"]
 
         last_end_time = max(last_end_time, event.end_time)
 
@@ -174,14 +169,13 @@ async def find_available_timeslots(client_id: str,
         if start_time is None:
             start_time = datetime.now(timezone.utc)
         if end_time is None:
-            end_time = start_time + timedelta(days=1)
+            end_time = start_time + timedelta(days=2)
 
         events = get_agent_events(client_id, agent_id, start_time, end_time)
         available_slots = find_slots(events, start_time, duration_minutes, num_slots)
-
         if available_slots is None or len(available_slots) < num_slots:    
-            # if no enough available slots, find the potential earliest slot in the next 5 days
-            start_time = end_time
+            # if no enough available slots, expand events from last event by 5 days
+            start_time = events[-1].end_time
             end_time = start_time + timedelta(days=5)
             events = get_agent_events(client_id, agent_id, start_time, end_time)
             available_slots = find_slots(events, start_time, duration_minutes, num_slots-len(available_slots))

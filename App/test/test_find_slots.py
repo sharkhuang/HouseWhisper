@@ -27,41 +27,42 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
     if not events:
         for i in range(limit):
             slot = {
-                "start": start_time,
-                "end": start_time + duration_delta,
+                "start": last_end_time,
+                "end": last_end_time + duration_delta,
                 "duration_minutes": duration_minutes
             }
             available_slots.append(slot)
-            start_time += duration_delta
+            last_end_time = slot["end"]
         return available_slots
+    else:
+        while last_end_time + duration_delta <= events[0].start_time:
+            slot = { "start": last_end_time, "end": last_end_time + duration_delta, "duration_minutes": duration_minutes}
+            available_slots.append(slot)
+            if len(available_slots) >= limit:
+                return available_slots
+            last_end_time = slot["end"]
 
-    # Find slots before first event
-    while start_time + duration_delta <= events[0].start_time:
-        slot = {
-            "start": start_time,
-            "end": start_time + duration_delta,
-            "duration_minutes": duration_minutes
-        }
-        available_slots.append(slot)
-        if len(available_slots) >= limit:
-            return available_slots
-        start_time += duration_delta
+    for event in events:
+        if event.end_time <= start_time:
+            continue
 
-    # Check intervals between events
-    for i in range(len(events) - 1):
-        current_end = events[i].end_time
-        next_start = events[i + 1].start_time
-        
-        while current_end + duration_delta <= next_start:
+        if last_end_time >= event.start_time and last_end_time < event.end_time:
+            last_end_time = event.end_time
+            continue
+
+        while last_end_time + duration_delta <= event.start_time:
             slot = {
-                "start": current_end,
-                "end": current_end + duration_delta,
+                "start": last_end_time,
+                "end": last_end_time+duration_delta,
                 "duration_minutes": duration_minutes
             }
             available_slots.append(slot)
             if len(available_slots) >= limit:
                 return available_slots
-            current_end += duration_delta
+
+            last_end_time = slot["end"]
+
+        last_end_time = max(last_end_time, event.end_time)
 
     return available_slots
 
@@ -147,7 +148,6 @@ class TestFindSlots:
         assert slots[1]["end"] == datetime(2024, 3, 1, 9, 0, tzinfo=timezone.utc)
         assert slots[2]["start"] == datetime(2024, 3, 1, 10, 0, tzinfo=timezone.utc)
         assert slots[2]["end"] == datetime(2024, 3, 1, 10, 30, tzinfo=timezone.utc)
-
 
     def test_respect_limit(self):
         """Test that the function respects the slot limit"""

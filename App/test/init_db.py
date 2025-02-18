@@ -1,6 +1,7 @@
 import sys
 import os
 import pytz
+from datetime import datetime, timedelta, timezone
 
 # Get the absolute path to the project root
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +24,7 @@ def main():
     sync_calendar_to_db("123", "456", calendar_path)
     
     # Retrieve and print events
-    events = get_agent_events("123", "456")
+    events = get_agent_events("123", "456", datetime.now(timezone.utc) - timedelta(days=100), datetime.now(timezone.utc) + timedelta(days=100))
     for event in events:
         print(f"Calendar ID: {event.calendar_id}")
         print(f"Client ID: {event.client_id}")

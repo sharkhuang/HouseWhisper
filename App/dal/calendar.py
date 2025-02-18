@@ -172,7 +172,6 @@ def merge_calendar_to_db(client_id: str, agent_id: str, calendar_path):
 
 def get_agent_events(client_id: str, agent_id: str, start_time: datetime, end_time: datetime):
     try:
-        max_events = 100
         db = get_db()
         query = db.query(CalendarEvent).filter(
             (CalendarEvent.client_id == client_id) &
@@ -189,7 +188,11 @@ def get_agent_events(client_id: str, agent_id: str, start_time: datetime, end_ti
             )
         )
         
-        events = query.order_by(CalendarEvent.start_time.asc()).limit(max_events).all()
+        events = query.order_by(CalendarEvent.start_time.asc()).all()
+        print("------------5555-----------------")
+        for event in events:
+            print(event.start_time, event.end_time)
+        print("--------------------------------")
         return events
     except Exception as e:
         print(f"Error in get_events: {str(e)}")
