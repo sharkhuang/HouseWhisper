@@ -104,7 +104,18 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
   
     last_end_time = start_time if start_time else datetime.now(timezone.utc)
 
+    if start_time < events[0].start_time:
+        while start_time + duration_delta < events[0].start_time:
+            slot = { "start": start_time, "end": start_time + duration_delta, "duration_minutes": duration_minutes}
+            print("slot")
+            print(slot)
+            available_slots.append(slot)
+            if len(available_slots) >= limit:
+                return available_slots
+            last_end_time = slot["end"]
+            start_time = slot["end"]
     # Check intervals between events
+
     for event in events:
         if event.end_time <= start_time:
             continue
@@ -116,7 +127,7 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
         interval_start = last_end_time
         interval_end = event.start_time
         # If interval is large enough
-        if interval_end - interval_start >= duration_delta:
+        while interval_end - interval_start >= duration_delta:
             available_slot = {
                 "start": interval_start,
                 "end": interval_end,
@@ -125,7 +136,9 @@ def find_slots(events, start_time: datetime, duration_minutes: int, limit: int =
             available_slots.append(available_slot)
             if len(available_slots) >= limit:
                 break
-                
+            interval_start = interval_end
+            interval_end = interval_start + duration_delta
+
         last_end_time = max(last_end_time, event.end_time)
 
     return available_slots
@@ -161,12 +174,12 @@ async def find_available_timeslots(client_id: str,
         events = get_agent_events(client_id, agent_id, start_time, end_time)
         available_slots = find_slots(events, start_time, duration_minutes, num_slots)
 
-        if available_slots is None or len(available_slots) == 0:
-            # if no available slots, find the potential earliest slot in the next 5 days
+        if available_slots is None or len(available_slots) < num_slots:    
+            # if no enough available slots, find the potential earliest slot in the next 5 days
             start_time = end_time
             end_time = start_time + timedelta(days=5)
             events = get_agent_events(client_id, agent_id, start_time, end_time)
-            available_slots = find_slots(events, start_time, duration_minutes, num_slots)
+            available_slots = find_slots(events, start_time, duration_minutes, num_slots-len(available_slots))
             if available_slots is None or len(available_slots) == 0:
                 return {
                     "message": f"No available slots in the search range and 5 days later",
